@@ -85,7 +85,7 @@ const LoadingScreenWithVideo = ({ onFinish }: { onFinish: () => void }) => {
         {/* Logo Overlay */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <img
-            src="https://github.com/Samurai315/supernova/blob/main/logo.png"
+            src="https://github.com/Samurai315/supernova/blob/main/logo.png?raw=true"
             alt="SuperNova Logo"
             className={`w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 object-contain transition-opacity duration-500 ${
               showLogo ? 'opacity-100' : 'opacity-0'
