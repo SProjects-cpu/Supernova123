@@ -1,0 +1,8 @@
+# Handle client-side routing for React SPA
+/*    /index.html   200
+
+# API routes (if any)
+/api/*  /api/:splat  200
+
+# Static assets
+/assets/*  /assets/:splat  200

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: event-center
+    env: node
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CONVEX_DEPLOYMENT
+        value: dev:necessary-badger-880
+      - key: VITE_CONVEX_URL
+        value: https://necessary-badger-880.convex.cloud
+      - key: AUTH_SECRET
+        value: your-super-secret-auth-key-for-convex-auth-system-2024
+    healthCheckPath: /
