@@ -75,7 +75,7 @@ const LoadingScreenWithVideo = ({ onFinish }: { onFinish: () => void }) => {
       <div className={`fixed inset-0 bg-black z-50 video-loading-screen ${fadeOutScreen ? 'opacity-0' : 'opacity-100'}`}>
         <video
           ref={videoRef}
-          src="/loading.mp4"
+          src="https://github.com/Samurai315/supernova/raw/refs/heads/main/loading.mp4"
           className="w-full h-full object-cover"
           playsInline
           muted
