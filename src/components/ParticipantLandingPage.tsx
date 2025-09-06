@@ -75,7 +75,7 @@ const LoadingScreenWithVideo = ({ onFinish }: { onFinish: () => void }) => {
       <div className={`fixed inset-0 bg-black z-50 video-loading-screen ${fadeOutScreen ? 'opacity-0' : 'opacity-100'}`}>
         <video
           ref={videoRef}
-          src="/loading.mp4"
+          src="https://github.com/Samurai315/supernova/raw/refs/heads/main/loading.mp4"
           className="w-full h-full object-cover"
           playsInline
           muted
@@ -86,7 +86,7 @@ const LoadingScreenWithVideo = ({ onFinish }: { onFinish: () => void }) => {
         {/* Logo Overlay */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <img
-            src="/logo.png"
+            src="https://github.com/Samurai315/supernova/blob/main/logo.png?raw=true"
             alt="SuperNova Logo"
             className={`w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 object-contain transition-opacity duration-500 ${
               showLogo ? 'opacity-100' : 'opacity-0'
