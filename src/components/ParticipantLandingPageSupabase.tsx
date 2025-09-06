@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { ParticipantTestPage } from "./ParticipantTestPage";
+import { EventService, RegistrationService, TestService, InstitutionService, NewsService } from "../lib/database";
 import { EventCard } from "./EventCard";
 import { EventSelectionModal } from "./EventSelectionModal";
 import { EventSpecificRegistrationForm } from "./EventSpecificRegistrationForm";
 import { NewsUpdatesSection } from "./NewsUpdatesSection";
-import { Id } from "../../convex/_generated/dataModel";
+import { ParticipantTestPage } from "./ParticipantTestPage";
 
 interface ParticipantLandingPageProps {
   onSwitchToOrganizer: () => void;
@@ -80,7 +78,6 @@ const LoadingScreenWithVideo = ({ onFinish }: { onFinish: () => void }) => {
           playsInline
           muted
           preload="auto"
-          playbackRate={3}
         />
 
         {/* Logo Overlay */}
@@ -134,24 +131,74 @@ const RegistrationLoadingModal = ({ isOpen, onClose }: { isOpen: boolean; onClos
   );
 };
 
-export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandingPageProps) {
+export function ParticipantLandingPageSupabase({ onSwitchToOrganizer }: ParticipantLandingPageProps) {
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [showEventSelection, setShowEventSelection] = useState(false);
   const [showSpecificRegistration, setShowSpecificRegistration] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState<Id<"events"> | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [showPreQualifierTests, setShowPreQualifierTests] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoadingRegistration, setIsLoadingRegistration] = useState(false);
 
-  // Data queries
-  const events = useQuery(api.events.list, {});
-  const testNotification = useQuery(api.preQualifierTests.getUpcomingTestsNotification);
-  const participatingInstitutions = useQuery(api.participatingInstitutions.getActiveInstitutions);
-  const activeSponsors = useQuery(api.participatingInstitutions.getActiveSponsors);
+  // Data state
+  const [events, setEvents] = useState<any[]>([]);
+  const [participatingInstitutions, setParticipatingInstitutions] = useState<any[]>([]);
+  const [activeSponsors, setActiveSponsors] = useState<any[]>([]);
+  const [testNotification, setTestNotification] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Load all data in parallel
+        const [eventsData, institutionsData, testsData] = await Promise.all([
+          EventService.getAll(),
+          InstitutionService.getAll(),
+          TestService.getAll()
+        ]);
+
+        setEvents(eventsData);
+        setParticipatingInstitutions(institutionsData);
+        
+        // Filter sponsors (companies)
+        const sponsors = institutionsData.filter(inst => inst.type === 'company');
+        setActiveSponsors(sponsors);
+
+        // Check for active/upcoming tests
+        const now = Date.now();
+        const activeTests = testsData.filter(test => 
+          new Date(test.start_date).getTime() <= now && new Date(test.end_date).getTime() >= now
+        );
+        const upcomingTests = testsData.filter(test => 
+          new Date(test.start_date).getTime() > now && new Date(test.start_date).getTime() <= now + (24 * 60 * 60 * 1000)
+        );
+
+        setTestNotification({
+          hasActiveTests: activeTests.length > 0,
+          hasUpcomingTests: upcomingTests.length > 0,
+          activeTestsCount: activeTests.length,
+          upcomingTestsCount: upcomingTests.length
+        });
+
+      } catch (err: any) {
+        console.error('Error loading data:', err);
+        setError(err.message || 'Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Derived data
-  const publishedEvents = events?.filter(event => event.status === "published") || [];
-  const allEvents = events || [];
+  const publishedEvents = events.filter(event => event.status === "published");
+  const allEvents = events;
 
   // Handle loading finish
   const handleLoadingFinish = () => {
@@ -163,19 +210,19 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
     setIsLoadingRegistration(true);
     
     // If events data is already loaded, open modal immediately
-    if (events) {
+    if (events.length > 0) {
       setIsLoadingRegistration(false);
       setShowEventSelection(true);
       return;
     }
     
     // Otherwise, wait for events data to load
-    // The useEffect below will handle opening the modal once data is loaded
+    // The useEffect above will handle opening the modal once data is loaded
   };
 
   // Handle opening event selection modal once events are loaded
   useEffect(() => {
-    if (events && isLoadingRegistration) {
+    if (events.length > 0 && isLoadingRegistration) {
       // Add a small delay for better UX
       const timer = setTimeout(() => {
         setIsLoadingRegistration(false);
@@ -189,6 +236,27 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
   // Show loading screen first
   if (showLoadingScreen) {
     return <LoadingScreenWithVideo onFinish={handleLoadingFinish} />;
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen relative overflow-hidden">
+        <div className="relative z-10 min-h-screen flex items-center justify-center">
+          <div className="text-center bg-dark-blue/40 backdrop-blur-md border border-medium-blue/30 rounded-2xl p-8 max-w-md mx-4">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-starlight-white mb-4">Connection Error</h2>
+            <p className="text-starlight-white/70 mb-6">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-gradient-to-r from-supernova-gold to-plasma-orange text-space-navy font-bold rounded-xl hover:scale-105 transform transition-all duration-300"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -392,10 +460,15 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
               🎯 Upcoming Events
             </h2>
             
-            {publishedEvents.length > 0 ? (
+            {loading ? (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 border-4 border-accent-blue border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-silver/70">Loading events...</p>
+              </div>
+            ) : publishedEvents.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                 {publishedEvents.map((event) => (
-                  <EventCard key={event._id} event={event} showRegisterButton={false} />
+                  <EventCard key={event.id} event={event} showRegisterButton={false} />
                 ))}
               </div>
             ) : (
@@ -429,11 +502,11 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {allEvents.map((event) => (
-                        <div key={event._id} className="p-4 bg-space-navy/50 rounded-xl border border-stellar-blue/20 hover:border-supernova-gold/30 transition-colors">
-                          {event.eventImage && (
+                        <div key={event.id} className="p-4 bg-space-navy/50 rounded-xl border border-stellar-blue/20 hover:border-supernova-gold/30 transition-colors">
+                          {event.event_image && (
                             <div className="h-24 mb-2 overflow-hidden rounded-lg">
                               <img 
-                                src={event.eventImage} 
+                                src={event.event_image} 
                                 alt={event.title} 
                                 className="w-full h-full object-cover"
                               />
@@ -450,12 +523,12 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
                           </span>
                           </div>
                           <div className="text-starlight-white/60 text-xs mt-1">
-                            📅 {new Date(event.startDate).toLocaleDateString('en-US', {
+                            📅 {new Date(event.start_date).toLocaleDateString('en-US', {
                               month: 'short', day: 'numeric'
                             })}
                           </div>
                           <div className="text-starlight-white/60 text-xs">
-                            💰 ₹{event.registrationFee || 0}
+                            💰 ₹{event.registration_fee || 0}
                           </div>
                         </div>
                       ))}
@@ -496,7 +569,7 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
               {participatingInstitutions?.filter(inst => inst.type !== 'company').map((institution) => (
-                <div key={institution._id} className="p-4 sm:p-6 bg-dark-blue/40 backdrop-blur-md border border-medium-blue/30 rounded-xl hover:border-accent-blue/40 hover:shadow-xl transition-all duration-300">
+                <div key={institution.id} className="p-4 sm:p-6 bg-dark-blue/40 backdrop-blur-md border border-medium-blue/30 rounded-xl hover:border-accent-blue/40 hover:shadow-xl transition-all duration-300">
                   <div className="text-center">
                     {institution.logo ? (
                       <img 
@@ -525,7 +598,7 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
               {activeSponsors?.map((sponsor) => (
-                <div key={sponsor._id} className="p-4 sm:p-6 bg-dark-blue/40 backdrop-blur-md border border-medium-blue/30 rounded-xl hover:border-accent-blue/40 hover:shadow-xl transition-all duration-300">
+                <div key={sponsor.id} className="p-4 sm:p-6 bg-dark-blue/40 backdrop-blur-md border border-medium-blue/30 rounded-xl hover:border-accent-blue/40 hover:shadow-xl transition-all duration-300">
                   <div className="text-center">
                     {sponsor.logo ? (
                       <img 
@@ -650,7 +723,7 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
         {showSpecificRegistration && selectedEventId && (
           <EventSpecificRegistrationForm
             eventId={selectedEventId}
-            event={allEvents?.find(e => e._id === selectedEventId)}
+            event={allEvents?.find(e => e.id === selectedEventId)}
             onClose={() => {
               setShowSpecificRegistration(false);
               setSelectedEventId(null);

@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { AuthWrapper } from "./components/AuthWrapper";
 import { ParticipantLandingPage } from "./components/ParticipantLandingPage";
 import { SuperAdminLogin } from "./components/SuperAdminLogin";
@@ -49,33 +51,60 @@ export default function App() {
         <SuperAdminDashboard onSignOut={handleSuperAdminSignOut} />
         <Toaster position="bottom-right" />
         <Watermark />
+        <Analytics />
+        <SpeedInsights />
       </>
     );
   }
 
   return (
-    <Routes>
-      <Route
-        path="/"
-        element={
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <div className="min-h-screen relative overflow-hidden">
+              <SimpleVideoBackground />
+              <main className="relative z-10">
+                {viewMode === "participant" ? (
+                  <ParticipantLandingPage onSwitchToOrganizer={() => setViewMode("organizer")} />
+                ) : (
+                  <AuthWrapper />
+                )}
+              </main>
+
+              {/* Super Admin Login Modal */}
+              {showSuperAdminLogin && (
+                <SuperAdminLogin
+                  onSuccess={handleSuperAdminSuccess}
+                  onCancel={() => setShowSuperAdminLogin(false)}
+                />
+              )}
+
+              <Toaster
+                theme="dark"
+                toastOptions={{
+                  style: {
+                    background: 'rgba(15, 23, 42, 0.95)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    color: '#F1F5F9',
+                    backdropFilter: 'blur(12px)',
+                    boxShadow: '0 0 20px rgba(59, 130, 246, 0.1)'
+                  }
+                }}
+              />
+
+              {/* Watermark */}
+              <Watermark />
+            </div>
+          }
+        />
+        <Route path="/events/:eventId" element={
           <div className="min-h-screen relative overflow-hidden">
             <SimpleVideoBackground />
             <main className="relative z-10">
-              {viewMode === "participant" ? (
-                <ParticipantLandingPage onSwitchToOrganizer={() => setViewMode("organizer")} />
-              ) : (
-                <AuthWrapper />
-              )}
+              <EventPage />
             </main>
-
-            {/* Super Admin Login Modal */}
-            {showSuperAdminLogin && (
-              <SuperAdminLogin
-                onSuccess={handleSuperAdminSuccess}
-                onCancel={() => setShowSuperAdminLogin(false)}
-              />
-            )}
-
             <Toaster
               theme="dark"
               toastOptions={{
@@ -88,33 +117,14 @@ export default function App() {
                 }
               }}
             />
-
-            {/* Watermark */}
             <Watermark />
           </div>
-        }
-      />
-      <Route path="/events/:eventId" element={
-        <div className="min-h-screen relative overflow-hidden">
-          <SimpleVideoBackground />
-          <main className="relative z-10">
-            <EventPage />
-          </main>
-          <Toaster
-            theme="dark"
-            toastOptions={{
-              style: {
-                background: 'rgba(15, 23, 42, 0.95)',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-                color: '#F1F5F9',
-                backdropFilter: 'blur(12px)',
-                boxShadow: '0 0 20px rgba(59, 130, 246, 0.1)'
-              }
-            }}
-          />
-          <Watermark />
-        </div>
-      } />
-    </Routes>
+        } />
+      </Routes>
+      
+      {/* Vercel Analytics and Speed Insights */}
+      <Analytics />
+      <SpeedInsights />
+    </>
   );
 }

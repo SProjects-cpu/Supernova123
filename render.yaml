@@ -1,16 +1,48 @@
 services:
   - type: web
-    name: event-center
+    name: supernova-event-platform
     env: node
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm install --include=dev && npm run build:supabase
     startCommand: npm start
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
-      - key: CONVEX_DEPLOYMENT
-        value: dev:necessary-badger-880
+      - key: VITE_SUPABASE_URL
+        value: https://spcoqbteworkkfeipssr.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwY29xYnRld29ya2tmZWlwc3NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcxODc2MzUsImV4cCI6MjA3Mjc2MzYzNX0.lJBrFKN385ga-5ljvT66E9E8-PQ-61OlN7J9yp_Ehl0
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwY29xYnRld29ya2tmZWlwc3NyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzE4NzYzNSwiZXhwIjoyMDcyNzYzNjM1fQ.JQzsGeIpJcMlZ2vZ0diWQI6Dx4I9XYLpZRbImiT19rM
       - key: VITE_CONVEX_URL
         value: https://necessary-badger-880.convex.cloud
+      - key: CONVEX_DEPLOYMENT
+        value: necessary-badger-880
       - key: AUTH_SECRET
-        value: your-super-secret-auth-key-for-convex-auth-system-2024
-    healthCheckPath: /
+        value: your-super-secret-auth-key-for-production-2024
+      - key: DATABASE_PRIMARY
+        value: supabase
+      - key: DATABASE_BACKUP
+        value: convex
+      - key: ENABLE_BACKUP_SYNC
+        value: true
+      - key: VITE_ENABLE_REAL_TIME
+        value: true
+      - key: VITE_CACHE_DURATION
+        value: 300000
+      - key: VITE_MAX_RETRIES
+        value: 3
+      - key: VITE_ENABLE_ANALYTICS
+        value: true
+      - key: VITE_LOG_LEVEL
+        value: info
+    regions:
+      - oregon
+    plan: starter
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+    disk:
+      name: supernova-storage
+      mountPath: /data
+      sizeGB: 1
