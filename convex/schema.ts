@@ -25,6 +25,7 @@ const applicationTables = {
     eventImage: v.optional(v.string()), // New field for event image
     registrationFee: v.optional(v.number()), // New field for registration fee
     paymentLink: v.optional(v.string()), // New field for payment link
+    participantRegistrationUrl: v.optional(v.string()), // External registration URL for participants
     tags: v.array(v.string())
   })
     .index("by_organizer", ["organizerId"])

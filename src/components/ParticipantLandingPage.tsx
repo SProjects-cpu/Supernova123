@@ -3,10 +3,10 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ParticipantTestPage } from "./ParticipantTestPage";
 import { EventCard } from "./EventCard";
-import { EventSelectionModal } from "./EventSelectionModal";
-import { EventSpecificRegistrationForm } from "./EventSpecificRegistrationForm";
+import { StaticEventCard } from "./StaticEventCard";
 import { NewsUpdatesSection } from "./NewsUpdatesSection";
 import { Id } from "../../convex/_generated/dataModel";
+import { getPublishedEvents, staticEvents } from "../data/staticEvents";
 
 interface ParticipantLandingPageProps {
   onSwitchToOrganizer: () => void;
@@ -80,7 +80,6 @@ const LoadingScreenWithVideo = ({ onFinish }: { onFinish: () => void }) => {
           playsInline
           muted
           preload="auto"
-          playbackRate={3}
         />
 
         {/* Logo Overlay */}
@@ -136,55 +135,67 @@ const RegistrationLoadingModal = ({ isOpen, onClose }: { isOpen: boolean; onClos
 
 export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandingPageProps) {
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
-  const [showEventSelection, setShowEventSelection] = useState(false);
-  const [showSpecificRegistration, setShowSpecificRegistration] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState<Id<"events"> | null>(null);
   const [showPreQualifierTests, setShowPreQualifierTests] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoadingRegistration, setIsLoadingRegistration] = useState(false);
 
-  // Data queries
-  const events = useQuery(api.events.list, {});
+  // Data queries - with static fallback for fast loading
+  const dynamicEvents = useQuery(api.events.list, {});
   const testNotification = useQuery(api.preQualifierTests.getUpcomingTestsNotification);
   const participatingInstitutions = useQuery(api.participatingInstitutions.getActiveInstitutions);
   const activeSponsors = useQuery(api.participatingInstitutions.getActiveSponsors);
 
-  // Derived data
-  const publishedEvents = events?.filter(event => event.status === "published") || [];
-  const allEvents = events || [];
+  // Use static events for immediate loading, fallback to dynamic events when available
+  const staticPublishedEvents = getPublishedEvents();
+  const dynamicPublishedEvents = dynamicEvents ? dynamicEvents.filter(event => event.status === "published") : [];
+  const allDynamicEvents = dynamicEvents || [];
+  
+  // Flag to determine if we're using static or dynamic events
+  const usingStaticEvents = !dynamicEvents || dynamicEvents.length === 0;
+  
+  // Use appropriate events based on availability
+  const publishedEvents = usingStaticEvents ? staticPublishedEvents : dynamicPublishedEvents;
+  const allEvents = usingStaticEvents ? staticEvents : allDynamicEvents;
 
   // Handle loading finish
   const handleLoadingFinish = () => {
     setShowLoadingScreen(false);
   };
 
-  // Handle registration button click
+  // Handle registration button click - redirect to external URL
   const handleRegistrationClick = async () => {
     setIsLoadingRegistration(true);
     
-    // If events data is already loaded, open modal immediately
-    if (events) {
-      setIsLoadingRegistration(false);
-      setShowEventSelection(true);
-      return;
-    }
-    
-    // Otherwise, wait for events data to load
-    // The useEffect below will handle opening the modal once data is loaded
-  };
-
-  // Handle opening event selection modal once events are loaded
-  useEffect(() => {
-    if (events && isLoadingRegistration) {
-      // Add a small delay for better UX
-      const timer = setTimeout(() => {
-        setIsLoadingRegistration(false);
-        setShowEventSelection(true);
-      }, 500);
+    try {
+      // Get the global registration URL or use the default one
+      const defaultUrl = "https://erp.mgmu.ac.in/asd_EventPublicUserMaster.htm?eventID=152";
       
-      return () => clearTimeout(timer);
+      // If there are events with specific registration URLs, use the first one
+      // Otherwise, use the default URL
+      let registrationUrl = defaultUrl;
+      
+      if (usingStaticEvents) {
+        // For static events, check if any have a registration URL
+        const eventWithUrl = staticPublishedEvents.find(event => event.participantRegistrationUrl);
+        if (eventWithUrl && eventWithUrl.participantRegistrationUrl) {
+          registrationUrl = eventWithUrl.participantRegistrationUrl;
+        }
+      } else if (dynamicEvents && dynamicEvents.length > 0) {
+        const eventWithUrl = dynamicEvents.find(event => event.participantRegistrationUrl);
+        if (eventWithUrl && eventWithUrl.participantRegistrationUrl) {
+          registrationUrl = eventWithUrl.participantRegistrationUrl;
+        }
+      }
+      
+      // Open the external registration URL in a new tab
+      window.open(registrationUrl, '_blank');
+    } finally {
+      // Reset loading state after a short delay
+      setTimeout(() => {
+        setIsLoadingRegistration(false);
+      }, 1000);
     }
-  }, [events, isLoadingRegistration]);
+  };
 
   // Show loading screen first
   if (showLoadingScreen) {
@@ -212,14 +223,9 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
               <div className="hidden lg:flex items-center gap-2 xl:gap-4">
                 <button
                   onClick={handleRegistrationClick}
-                  disabled={isLoadingRegistration}
-                  className="px-3 xl:px-6 py-2 bg-gradient-to-r from-supernova-gold to-plasma-orange text-space-navy font-bold rounded-lg hover:scale-105 transform transition-all duration-300 shadow-lg backdrop-blur-sm text-sm xl:text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[140px] justify-center"
+                  className="px-3 xl:px-6 py-2 bg-gradient-to-r from-supernova-gold to-plasma-orange text-space-navy font-bold rounded-lg hover:scale-105 transform transition-all duration-300 shadow-lg backdrop-blur-sm text-sm xl:text-base flex items-center gap-2 min-w-[140px] justify-center"
                 >
-                  {isLoadingRegistration ? (
-                    <div className="w-4 h-4 border-2 border-space-navy/30 border-t-space-navy rounded-full animate-spin"></div>
-                  ) : (
-                    "Register Now"
-                  )}
+                  Register Now
                 </button>
 
                 <div className="relative">
@@ -277,14 +283,9 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
                       handleRegistrationClick();
                       setIsMobileMenuOpen(false);
                     }}
-                    disabled={isLoadingRegistration}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-supernova-gold to-plasma-orange text-space-navy font-bold rounded-lg text-center touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[48px]"
+                    className="w-full px-4 py-3 bg-gradient-to-r from-supernova-gold to-plasma-orange text-space-navy font-bold rounded-lg text-center touch-manipulation flex items-center justify-center gap-2 min-h-[48px]"
                   >
-                    {isLoadingRegistration ? (
-                      <div className="w-5 h-5 border-2 border-space-navy/30 border-t-space-navy rounded-full animate-spin"></div>
-                    ) : (
-                      "🚀 Register Now"
-                    )}
+                    🚀 Register Now
                   </button>
 
                   <div className="relative">
@@ -394,9 +395,15 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
             
             {publishedEvents.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-                {publishedEvents.map((event) => (
-                  <EventCard key={event._id} event={event} showRegisterButton={false} />
-                ))}
+                {usingStaticEvents ? (
+                  (publishedEvents as typeof staticPublishedEvents).map((event) => (
+                    <StaticEventCard key={event.id} event={event} showRegisterButton={false} />
+                  ))
+                ) : (
+                  (publishedEvents as typeof dynamicPublishedEvents).map((event) => (
+                    <EventCard key={event._id} event={event} showRegisterButton={false} />
+                  ))
+                )}
               </div>
             ) : (
               <div className="text-center py-16">
@@ -428,37 +435,71 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
                       </span>
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {allEvents.map((event) => (
-                        <div key={event._id} className="p-4 bg-space-navy/50 rounded-xl border border-stellar-blue/20 hover:border-supernova-gold/30 transition-colors">
-                          {event.eventImage && (
-                            <div className="h-24 mb-2 overflow-hidden rounded-lg">
-                              <img 
-                                src={event.eventImage} 
-                                alt={event.title} 
-                                className="w-full h-full object-cover"
-                              />
+                      {usingStaticEvents ? (
+                        (allEvents as typeof staticEvents).map((event) => (
+                          <div key={event.id} className="p-4 bg-space-navy/50 rounded-xl border border-stellar-blue/20 hover:border-supernova-gold/30 transition-colors">
+                            {event.eventImage && (
+                              <div className="h-24 mb-2 overflow-hidden rounded-lg">
+                                <img 
+                                  src={event.eventImage} 
+                                  alt={event.title} 
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex justify-between items-start mb-2">
+                              <h5 className="text-starlight-white font-medium text-sm line-clamp-2 flex-1">{event.title}</h5>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${
+                                event.status === 'published' ? 'bg-supernova-gold/20 text-supernova-gold' :
+                                event.status === 'draft' ? 'bg-medium-blue/20 text-starlight-white/70' :
+                                'bg-white/10 text-starlight-white/60'
+                            }`}>
+                              {event.status}
+                            </span>
                             </div>
-                          )}
-                          <div className="flex justify-between items-start mb-2">
-                            <h5 className="text-starlight-white font-medium text-sm line-clamp-2 flex-1">{event.title}</h5>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${
-                              event.status === 'published' ? 'bg-supernova-gold/20 text-supernova-gold' :
-                              event.status === 'draft' ? 'bg-medium-blue/20 text-starlight-white/70' :
-                              'bg-white/10 text-starlight-white/60'
-                          }`}>
-                            {event.status}
-                          </span>
+                            <div className="text-starlight-white/60 text-xs mt-1">
+                              📅 {new Date(event.startDate).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric'
+                              })}
+                            </div>
+                            <div className="text-starlight-white/60 text-xs">
+                              💰 ₹{event.registrationFee || 0}
+                            </div>
                           </div>
-                          <div className="text-starlight-white/60 text-xs mt-1">
-                            📅 {new Date(event.startDate).toLocaleDateString('en-US', {
-                              month: 'short', day: 'numeric'
-                            })}
+                        ))
+                      ) : (
+                        (allEvents as typeof allDynamicEvents).map((event) => (
+                          <div key={event._id} className="p-4 bg-space-navy/50 rounded-xl border border-stellar-blue/20 hover:border-supernova-gold/30 transition-colors">
+                            {event.eventImage && (
+                              <div className="h-24 mb-2 overflow-hidden rounded-lg">
+                                <img 
+                                  src={event.eventImage} 
+                                  alt={event.title} 
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex justify-between items-start mb-2">
+                              <h5 className="text-starlight-white font-medium text-sm line-clamp-2 flex-1">{event.title}</h5>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${
+                                event.status === 'published' ? 'bg-supernova-gold/20 text-supernova-gold' :
+                                event.status === 'draft' ? 'bg-medium-blue/20 text-starlight-white/70' :
+                                'bg-white/10 text-starlight-white/60'
+                            }`}>
+                              {event.status}
+                            </span>
+                            </div>
+                            <div className="text-starlight-white/60 text-xs mt-1">
+                              📅 {new Date(event.startDate).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric'
+                              })}
+                            </div>
+                            <div className="text-starlight-white/60 text-xs">
+                              💰 ₹{event.registrationFee || 0}
+                            </div>
                           </div>
-                          <div className="text-starlight-white/60 text-xs">
-                            💰 ₹{event.registrationFee || 0}
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
@@ -626,41 +667,6 @@ export function ParticipantLandingPage({ onSwitchToOrganizer }: ParticipantLandi
             </div>
           </div>
         </footer>
-
-        {/* Registration Loading Modal */}
-        <RegistrationLoadingModal 
-          isOpen={isLoadingRegistration} 
-          onClose={() => setIsLoadingRegistration(false)} 
-        />
-
-        {/* Event Selection Modal */}
-        {showEventSelection && (
-          <EventSelectionModal
-            onClose={() => setShowEventSelection(false)}
-            onEventSelect={(eventId) => {
-              setSelectedEventId(eventId);
-              setShowEventSelection(false);
-              setShowSpecificRegistration(true);
-            }}
-            events={allEvents}
-          />
-        )}
-
-        {/* Event-Specific Registration Form */}
-        {showSpecificRegistration && selectedEventId && (
-          <EventSpecificRegistrationForm
-            eventId={selectedEventId}
-            event={allEvents?.find(e => e._id === selectedEventId)}
-            onClose={() => {
-              setShowSpecificRegistration(false);
-              setSelectedEventId(null);
-            }}
-            onBack={() => {
-              setShowSpecificRegistration(false);
-              setShowEventSelection(true);
-            }}
-          />
-        )}
 
         {/* Pre-Qualifier Tests Modal */}
         {showPreQualifierTests && (

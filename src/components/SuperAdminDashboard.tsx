@@ -42,6 +42,7 @@ export function SuperAdminDashboard({ onSignOut }: SuperAdminDashboardProps) {
   const events = useQuery(api.events.list, {});
   const updatePaymentLink = useMutation(api.events.updatePaymentLink);
   const updateEvent = useMutation(api.events.updateEvent);
+  const updateParticipantRegistrationUrl = useMutation(api.events.updateParticipantRegistrationUrl);
 
   const stats = useQuery(api.superAdmin.getOrganizerJudgeStats, {
     superAdminEmail: SUPER_ADMIN_EMAIL,
@@ -159,6 +160,20 @@ export function SuperAdminDashboard({ onSignOut }: SuperAdminDashboardProps) {
       setEditingEvent(null);
     } catch (error: any) {
       toast.error(error.message || "Failed to update event");
+    }
+  };
+
+  const handleUpdateRegistrationUrl = async (eventId: Id<"events">, registrationUrl: string) => {
+    try {
+      await updateParticipantRegistrationUrl({
+        eventId,
+        participantRegistrationUrl: registrationUrl,
+        superAdminEmail: SUPER_ADMIN_EMAIL,
+        superAdminPassword: SUPER_ADMIN_PASSWORD
+      });
+      toast.success("Registration URL updated successfully! 🔗");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update registration URL");
     }
   };
 
@@ -510,6 +525,7 @@ export function SuperAdminDashboard({ onSignOut }: SuperAdminDashboardProps) {
           onClose={() => setShowEventManagement(false)}
           onUpdatePaymentLink={handleUpdatePaymentLink}
           onUpdateEvent={handleUpdateEvent}
+          onUpdateRegistrationUrl={handleUpdateRegistrationUrl}
           editingPaymentLink={editingPaymentLink}
           setEditingPaymentLink={setEditingPaymentLink}
           editingEvent={editingEvent}
@@ -742,6 +758,7 @@ function EventManagementModal({
   onClose,
   onUpdatePaymentLink,
   onUpdateEvent,
+  onUpdateRegistrationUrl,
   editingPaymentLink,
   setEditingPaymentLink,
   editingEvent,
@@ -759,6 +776,10 @@ function EventManagementModal({
     eventId: Id<"events">,
     eventData: any,
   ) => unknown;
+  onUpdateRegistrationUrl: (
+    eventId: Id<"events">,
+    registrationUrl: string,
+  ) => unknown;
   editingPaymentLink: { eventId: Id<"events">; currentLink: string } | null;
   setEditingPaymentLink: (
     value: { eventId: Id<"events">; currentLink: string } | null,
@@ -770,11 +791,22 @@ function EventManagementModal({
 }) {
   const [paymentLinkInput, setPaymentLinkInput] = useState("");
   const [eventFormData, setEventFormData] = useState<any>({});
+  const [registrationUrlInput, setRegistrationUrlInput] = useState("");
+  const [editingRegistrationUrl, setEditingRegistrationUrl] = useState<{eventId: Id<"events">, currentUrl: string} | null>(null);
 
   const handleSubmitPaymentLink = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingPaymentLink && paymentLinkInput.trim()) {
       void onUpdatePaymentLink(editingPaymentLink.eventId, paymentLinkInput.trim());
+    }
+  };
+
+  const handleSubmitRegistrationUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingRegistrationUrl && registrationUrlInput.trim()) {
+      void onUpdateRegistrationUrl(editingRegistrationUrl.eventId, registrationUrlInput.trim());
+      setEditingRegistrationUrl(null);
+      setRegistrationUrlInput("");
     }
   };
 
@@ -844,14 +876,22 @@ function EventManagementModal({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="space-y-3">
                   <div className="flex-1">
                     <label className="block text-starlight-white/70 text-sm mb-1">Payment Link:</label>
                     <div className="text-starlight-white/60 text-sm bg-dark-blue/20 p-2 rounded border">
                       {event.paymentLink || "No payment link set"}
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
+                  
+                  <div className="flex-1">
+                    <label className="block text-starlight-white/70 text-sm mb-1">Participant Registration URL:</label>
+                    <div className="text-starlight-white/60 text-sm bg-dark-blue/20 p-2 rounded border">
+                      {event.participantRegistrationUrl || "Using default registration URL"}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 flex-wrap mt-4">
                     <button
                       onClick={() => initializeEventForm(event)}
                       className="px-3 py-2 bg-accent-blue hover:bg-accent-blue/80 text-starlight-white rounded font-medium transition-colors text-sm"
@@ -868,7 +908,19 @@ function EventManagementModal({
                       }}
                       className="px-3 py-2 bg-supernova-gold hover:bg-supernova-gold/80 text-space-navy rounded font-medium transition-colors text-sm"
                     >
-                      Update Link
+                      Update Payment
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingRegistrationUrl({
+                          eventId: event._id,
+                          currentUrl: event.participantRegistrationUrl || ""
+                        });
+                        setRegistrationUrlInput(event.participantRegistrationUrl || "");
+                      }}
+                      className="px-3 py-2 bg-electric-blue hover:bg-electric-blue/80 text-starlight-white rounded font-medium transition-colors text-sm"
+                    >
+                      Update Reg URL
                     </button>
                     <button
                       onClick={() => {
@@ -924,6 +976,49 @@ function EventManagementModal({
                   <button
                     type="submit"
                     className="flex-1 px-4 py-2 bg-supernova-gold hover:bg-supernova-gold/80 text-space-navy rounded font-medium transition-colors"
+                  >
+                    Update
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Registration URL Edit Modal */}
+        {editingRegistrationUrl && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-60">
+            <div className="bg-space-navy/95 backdrop-blur-md border border-medium-blue/30 rounded-xl p-6 w-full max-w-md">
+              <h3 className="text-lg font-bold text-starlight-white mb-4">Update Registration URL</h3>
+              <form onSubmit={handleSubmitRegistrationUrl}>
+                <div className="mb-4">
+                  <label className="block text-starlight-white/70 text-sm mb-2">Participant Registration URL:</label>
+                  <input
+                    type="url"
+                    value={registrationUrlInput}
+                    onChange={(e) => setRegistrationUrlInput(e.target.value)}
+                    placeholder="https://erp.mgmu.ac.in/asd_EventPublicUserMaster.htm?eventID=152"
+                    className="w-full px-3 py-2 bg-dark-blue/40 border border-medium-blue/30 rounded text-starlight-white placeholder-starlight-white/40 focus:border-electric-blue focus:ring-1 focus:ring-electric-blue outline-none"
+                    required
+                  />
+                  <p className="text-starlight-white/50 text-xs mt-2">
+                    This URL will be used when participants click the registration button on the landing page.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingRegistrationUrl(null);
+                      setRegistrationUrlInput("");
+                    }}
+                    className="flex-1 px-4 py-2 bg-medium-blue hover:bg-medium-blue/80 text-starlight-white rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-electric-blue hover:bg-electric-blue/80 text-starlight-white rounded font-medium transition-colors"
                   >
                     Update
                   </button>

@@ -44,6 +44,7 @@ export const list = query({
     eventImage: v.optional(v.string()),
     registrationFee: v.optional(v.number()),
     paymentLink: v.optional(v.string()),
+    participantRegistrationUrl: v.optional(v.string()),
     tags: v.array(v.string()),
     organizer: v.object({
       name: v.string(),
@@ -117,6 +118,7 @@ export const getById = query({
     eventImage: v.optional(v.string()),
     registrationFee: v.optional(v.number()),
     paymentLink: v.optional(v.string()),
+    participantRegistrationUrl: v.optional(v.string()),
     tags: v.array(v.string()),
     organizer: v.object({
       name: v.string(),
@@ -690,5 +692,48 @@ export const updateEvent = mutation({
 
     await ctx.db.patch(args.eventId, updateData);
     return { success: true };
+  },
+});
+
+// Update participant registration URL for events (Super admin only)
+export const updateParticipantRegistrationUrl = mutation({
+  args: {
+    eventId: v.id("events"),
+    participantRegistrationUrl: v.string(),
+    superAdminEmail: v.string(),
+    superAdminPassword: v.string()
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    // Verify super admin credentials
+    const SUPER_ADMIN_EMAIL = "rutvikburra@gmail.com";
+    const SUPER_ADMIN_PASSWORD = "rutvikburra1234567890@#E";
+
+    if (args.superAdminEmail !== SUPER_ADMIN_EMAIL || args.superAdminPassword !== SUPER_ADMIN_PASSWORD) {
+      throw new Error("Invalid super admin credentials");
+    }
+
+    const event = await ctx.db.get(args.eventId);
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    await ctx.db.patch(args.eventId, {
+      participantRegistrationUrl: args.participantRegistrationUrl
+    });
+    
+    return { success: true };
+  },
+});
+
+// Get global participant registration URL (for cases where no event-specific URL is set)
+export const getGlobalRegistrationUrl = query({
+  args: {},
+  returns: v.object({ url: v.string() }),
+  handler: async (ctx) => {
+    // Return the default URL if no event-specific URL is configured
+    return { 
+      url: "https://erp.mgmu.ac.in/asd_EventPublicUserMaster.htm?eventID=152" 
+    };
   },
 });
